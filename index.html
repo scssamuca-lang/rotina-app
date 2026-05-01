@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rotina App</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;max-width:430px;margin:0 auto}
+  header{padding:1.2rem 1rem 0.5rem;border-bottom:0.5px solid #2d3748}
+  header h1{font-size:18px;font-weight:500;color:#f7fafc}
+  header p{font-size:12px;color:#718096;margin-top:2px}
+  nav{display:flex;border-bottom:0.5px solid #2d3748}
+  nav button{flex:1;padding:0.75rem 0.5rem;background:none;border:none;color:#718096;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+  nav button.active{color:#a78bfa;border-bottom-color:#a78bfa}
+  .tab{display:none;padding:1rem}
+  .tab.active{display:block}
+  .input-row{display:flex;gap:8px;margin-bottom:1rem}
+  .input-row input,.input-row select{flex:1;background:#1a1f2e;border:0.5px solid #2d3748;border-radius:8px;padding:0.6rem 0.75rem;color:#e2e8f0;font-size:14px;outline:none}
+  .input-row input:focus{border-color:#7c3aed}
+  .input-row button,.add-btn{background:#7c3aed;border:none;border-radius:8px;padding:0.6rem 1rem;color:#fff;font-size:14px;cursor:pointer;white-space:nowrap}
+  .input-row button:active,.add-btn:active{opacity:0.85}
+  .item-card{background:#1a1f2e;border:0.5px solid #2d3748;border-radius:10px;padding:0.75rem 1rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:10px}
+  .item-card.done .item-text{text-decoration:line-through;color:#4a5568}
+  .item-card.done{opacity:0.6}
+  .item-text{flex:1;font-size:14px;color:#e2e8f0}
+  .item-time{font-size:12px;color:#a78bfa;min-width:40px;text-align:right}
+  .cb{width:20px;height:20px;border-radius:50%;border:2px solid #4a5568;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+  .cb.checked{background:#7c3aed;border-color:#7c3aed}
+  .cb.checked::after{content:'';width:6px;height:6px;background:#fff;border-radius:50%}
+  .del{background:none;border:none;color:#4a5568;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}
+  .del:hover{color:#e53e3e}
+  .section-label{font-size:11px;color:#718096;text-transform:uppercase;letter-spacing:.05em;margin:1rem 0 0.5rem}
+  .tag{font-size:11px;padding:2px 8px;border-radius:20px;background:#2d3748;color:#a0aec0}
+  .tag.feito{background:#1a2e1a;color:#68d391}
+  .prog-bar{height:4px;background:#2d3748;border-radius:4px;margin:0.5rem 0 1rem;overflow:hidden}
+  .prog-fill{height:100%;background:#7c3aed;border-radius:4px;transition:width .3s}
+  .empty{text-align:center;color:#4a5568;font-size:13px;padding:2rem 0}
+  .date-badge{font-size:12px;color:#a78bfa;background:#1a1f2e;border:0.5px solid #2d3748;border-radius:6px;padding:2px 8px;margin-bottom:1rem;display:inline-block}
+</style>
+</head>
+<body>
+<header>
+  <h1>Rotina App</h1>
+  <p id="data-hoje"></p>
+</header>
+<nav>
+  <button class="active" onclick="switchTab('tarefas',this)">Tarefas</button>
+  <button onclick="switchTab('habitos',this)">Hábitos</button>
+  <button onclick="switchTab('agenda',this)">Agenda</button>
+</nav>
+
+<div id="tarefas" class="tab active">
+  <div class="input-row" style="margin-top:0.25rem">
+    <input id="tInput" placeholder="Nova tarefa..." onkeydown="if(event.key==='Enter')addTarefa()">
+    <button onclick="addTarefa()">+</button>
+  </div>
+  <div id="tList"></div>
+</div>
+
+<div id="habitos" class="tab">
+  <div class="input-row" style="margin-top:0.25rem">
+    <input id="hInput" placeholder="Novo hábito..." onkeydown="if(event.key==='Enter')addHabito()">
+    <button onclick="addHabito()">+</button>
+  </div>
+  <div id="hProg" class="prog-bar"><div class="prog-fill" id="hFill" style="width:0%"></div></div>
+  <div id="hList"></div>
+</div>
+
+<div id="agenda" class="tab">
+  <div class="input-row" style="margin-top:0.25rem;flex-wrap:wrap">
+    <input id="aInput" placeholder="Compromisso..." style="flex:2;min-width:120px" onkeydown="if(event.key==='Enter')addAgenda()">
+    <input id="aHora" type="time" style="width:110px;flex-shrink:0">
+    <button onclick="addAgenda()">+</button>
+  </div>
+  <div id="aList"></div>
+</div>
+
+<script>
+const hoje = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+document.getElementById('data-hoje').textContent = hoje;
+
+let tarefas = JSON.parse(localStorage.getItem('rt_tarefas')||'[]');
+let habitos = JSON.parse(localStorage.getItem('rt_habitos')||'[]');
+let agenda = JSON.parse(localStorage.getItem('rt_agenda')||'[]');
+const dKey = new Date().toDateString();
+
+function save(){
+  localStorage.setItem('rt_tarefas',JSON.stringify(tarefas));
+  localStorage.setItem('rt_habitos',JSON.stringify(habitos));
+  localStorage.setItem('rt_agenda',JSON.stringify(agenda));
+}
+
+function switchTab(id, btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function addTarefa(){
+  const v=document.getElementById('tInput').value.trim();
+  if(!v)return;
+  tarefas.unshift({id:Date.now(),texto:v,feito:false});
+  document.getElementById('tInput').value='';
+  save();renderTarefas();
+}
+function toggleTarefa(id){
+  tarefas=tarefas.map(t=>t.id===id?{...t,feito:!t.feito}:t);
+  save();renderTarefas();
+}
+function delTarefa(id){
+  tarefas=tarefas.filter(t=>t.id!==id);
+  save();renderTarefas();
+}
+function renderTarefas(){
+  const el=document.getElementById('tList');
+  if(!tarefas.length){el.innerHTML='<div class="empty">Nenhuma tarefa ainda</div>';return;}
+  const pend=tarefas.filter(t=>!t.feito),done=tarefas.filter(t=>t.feito);
+  let h='';
+  if(pend.length){h+='<div class="section-label">Pendentes</div>';pend.forEach(t=>h+=card(t));}
+  if(done.length){h+='<div class="section-label">Concluídas</div>';done.forEach(t=>h+=card(t));}
+  el.innerHTML=h;
+}
+function card(t){
+  return `<div class="item-card ${t.feito?'done':''}">
+    <div class="cb ${t.feito?'checked':''}" onclick="toggleTarefa(${t.id})"></div>
+    <span class="item-text">${t.texto}</span>
+    <button class="del" onclick="delTarefa(${t.id})">×</button>
+  </div>`;
+}
+
+function addHabito(){
+  const v=document.getElementById('hInput').value.trim();
+  if(!v)return;
+  habitos.push({id:Date.now(),texto:v,checks:{}});
+  document.getElementById('hInput').value='';
+  save();renderHabitos();
+}
+function toggleHabito(id){
+  habitos=habitos.map(h=>h.id===id?{...h,checks:{...h.checks,[dKey]:!h.checks[dKey]}}:h);
+  save();renderHabitos();
+}
+function delHabito(id){
+  habitos=habitos.filter(h=>h.id!==id);
+  save();renderHabitos();
+}
+function renderHabitos(){
+  const el=document.getElementById('hList');
+  if(!habitos.length){el.innerHTML='<div class="empty">Nenhum hábito ainda</div>';return;}
+  const total=habitos.length,feitos=habitos.filter(h=>h.checks[dKey]).length;
+  document.getElementById('hFill').style.width=total?(feitos/total*100)+'%':'0%';
+  el.innerHTML=habitos.map(h=>`<div class="item-card">
+    <div class="cb ${h.checks[dKey]?'checked':''}" onclick="toggleHabito(${h.id})"></div>
+    <span class="item-text">${h.texto}</span>
+    <span class="tag ${h.checks[dKey]?'feito':''}">${h.checks[dKey]?'Feito':'Pendente'}</span>
+    <button class="del" onclick="delHabito(${h.id})">×</button>
+  </div>`).join('');
+}
+
+function addAgenda(){
+  const v=document.getElementById('aInput').value.trim();
+  const h=document.getElementById('aHora').value;
+  if(!v)return;
+  agenda.push({id:Date.now(),texto:v,hora:h});
+  agenda.sort((a,b)=>(a.hora||'99:99').localeCompare(b.hora||'99:99'));
+  document.getElementById('aInput').value='';
+  document.getElementById('aHora').value='';
+  save();renderAgenda();
+}
+function delAgenda(id){
+  agenda=agenda.filter(a=>a.id!==id);
+  save();renderAgenda();
+}
+function renderAgenda(){
+  const el=document.getElementById('aList');
+  if(!agenda.length){el.innerHTML='<div class="empty">Nenhum compromisso ainda</div>';return;}
+  el.innerHTML=agenda.map(a=>`<div class="item-card">
+    <span class="item-time">${a.hora||'--:--'}</span>
+    <span class="item-text">${a.texto}</span>
+    <button class="del" onclick="delAgenda(${a.id})">×</button>
+  </div>`).join('');
+}
+
+renderTarefas();renderHabitos();renderAgenda();
+</script>
+</body>
+</html>
